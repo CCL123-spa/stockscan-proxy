@@ -1,43 +1,37 @@
 const https = require('https');
 const http  = require('http');
 const zlib  = require('zlib');
-const fs    = require('fs');
-const path  = require('path');
 
 const PORT = process.env.PORT || 3000;
 const ALLOWED_INTERVALS = ['1d','1wk','1mo'];
 const ALLOWED_RANGES    = ['1mo','3mo','6mo','1y','2y','5y'];
 
 // ── APP HTML ─────────────────────────────────────────────────────────────────
-const APP_HTML_PATH = path.join(__dirname, 'app', 'index.html');
+// Redirige al raw de GitHub — más fiable que servir desde disco en Render
+const APP_GITHUB_RAW = 'https://raw.githubusercontent.com/CCL123-spa/stockscan-proxy/main/app/index.html';
 
 function serveAppHtml(res) {
-  try {
-    console.log(`[app] Buscando HTML en: ${APP_HTML_PATH}`);
-    console.log(`[app] __dirname: ${__dirname}`);
-    console.log(`[app] Existe: ${fs.existsSync(APP_HTML_PATH)}`);
-    
-    if (!fs.existsSync(APP_HTML_PATH)) {
-      // Listar archivos disponibles para debug
-      const files = fs.readdirSync(__dirname);
-      console.log(`[app] Archivos en __dirname: ${files.join(', ')}`);
-      res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
-      res.end(JSON.stringify({ error: 'App HTML no encontrado', path: APP_HTML_PATH, files }));
-      return;
-    }
-    const html = fs.readFileSync(APP_HTML_PATH, 'utf8');
-    console.log(`[app] HTML leído: ${html.length} bytes`);
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
+  // Hacer fetch del HTML desde GitHub raw y reenviarlo
+  https.get(APP_GITHUB_RAW, (ghRes) => {
+    let data = '';
+    ghRes.on('data', chunk => data += chunk);
+    ghRes.on('end', () => {
+      if (ghRes.statusCode !== 200 || data.length < 1000) {
+        res.writeHead(502, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ error: 'No se pudo obtener el HTML desde GitHub', status: ghRes.statusCode, length: data.length }));
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+      });
+      res.end(data);
     });
-    res.end(html);
-  } catch(e) {
-    console.error(`[app] Error: ${e.message}`);
+  }).on('error', (e) => {
     res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ error: e.message }));
-  }
+  });
 }
 
 // Polygon ticker map: nuestros tickers → formato Polygon
