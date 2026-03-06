@@ -9,17 +9,24 @@ const ALLOWED_INTERVALS = ['1d','1wk','1mo'];
 const ALLOWED_RANGES    = ['1mo','3mo','6mo','1y','2y','5y'];
 
 // ── APP HTML ─────────────────────────────────────────────────────────────────
-// El archivo index.html se sirve desde /app para que la app pueda auto-actualizarse
 const APP_HTML_PATH = path.join(__dirname, 'app', 'index.html');
 
 function serveAppHtml(res) {
   try {
+    console.log(`[app] Buscando HTML en: ${APP_HTML_PATH}`);
+    console.log(`[app] __dirname: ${__dirname}`);
+    console.log(`[app] Existe: ${fs.existsSync(APP_HTML_PATH)}`);
+    
     if (!fs.existsSync(APP_HTML_PATH)) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'App HTML no disponible aún' }));
+      // Listar archivos disponibles para debug
+      const files = fs.readdirSync(__dirname);
+      console.log(`[app] Archivos en __dirname: ${files.join(', ')}`);
+      res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ error: 'App HTML no encontrado', path: APP_HTML_PATH, files }));
       return;
     }
     const html = fs.readFileSync(APP_HTML_PATH, 'utf8');
+    console.log(`[app] HTML leído: ${html.length} bytes`);
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8',
       'Access-Control-Allow-Origin': '*',
@@ -27,7 +34,8 @@ function serveAppHtml(res) {
     });
     res.end(html);
   } catch(e) {
-    res.writeHead(500, { 'Content-Type': 'application/json' });
+    console.error(`[app] Error: ${e.message}`);
+    res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify({ error: e.message }));
   }
 }
