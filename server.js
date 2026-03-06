@@ -1,10 +1,36 @@
 const https = require('https');
 const http  = require('http');
 const zlib  = require('zlib');
+const fs    = require('fs');
+const path  = require('path');
 
 const PORT = process.env.PORT || 3000;
 const ALLOWED_INTERVALS = ['1d','1wk','1mo'];
 const ALLOWED_RANGES    = ['1mo','3mo','6mo','1y','2y','5y'];
+
+// ── APP HTML ─────────────────────────────────────────────────────────────────
+// El archivo index.html se sirve desde /app para que la app pueda auto-actualizarse
+const APP_HTML_PATH = path.join(__dirname, 'app', 'index.html');
+
+function serveAppHtml(res) {
+  try {
+    if (!fs.existsSync(APP_HTML_PATH)) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'App HTML no disponible aún' }));
+      return;
+    }
+    const html = fs.readFileSync(APP_HTML_PATH, 'utf8');
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+    });
+    res.end(html);
+  } catch(e) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: e.message }));
+  }
+}
 
 // Polygon ticker map: nuestros tickers → formato Polygon
 const POLYGON_MAP = {
@@ -94,7 +120,13 @@ const server = http.createServer(async (req, res) => {
 
   if (path === '/' || path === '/health') {
     res.writeHead(200);
-    res.end(JSON.stringify({ status: 'ok', service: 'StockScan Proxy', version: '2.0' }));
+    res.end(JSON.stringify({ status: 'ok', service: 'StockScan Proxy', version: '3.0' }));
+    return;
+  }
+
+  // Servir el HTML de la app para auto-actualización
+  if (path === '/app') {
+    serveAppHtml(res);
     return;
   }
 
@@ -165,4 +197,4 @@ const server = http.createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Ruta no encontrada' }));
 });
 
-server.listen(PORT, () => console.log(`StockScan Proxy v2.0 en puerto ${PORT}`));
+server.listen(PORT, () => console.log(`StockScan Proxy v3.0 en puerto ${PORT}`));
